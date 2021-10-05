@@ -17,6 +17,9 @@ from processing import *
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Slider, TextInput, Button, RangeSlider, Panel, Tabs, Legend, LegendItem, Span, RadioButtonGroup, Spinner
 
+import json
+from bokeh.embed import server_document 
+
 rospy.init_node('bokeh_server')
 
 pub = rospy.Publisher('response', String, queue_size=10)
@@ -183,7 +186,10 @@ tab3 = Panel(child=column(p3, row(truncation_threshold, truncate_button), time_r
 tab4 = Panel(child=column(p4, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Relative Joint Position")
 
 curdoc().add_root(Tabs(tabs=[tab1, tab2, tab3, tab4]))
-curdoc().title = "Truncating Trajectories"
+
+script = server_document("http://192.168.3.201:5006/dmp")
+print(json.dumps(script))
+#curdoc().title = "Truncating Trajectories"
 
 @gen.coroutine
 def ros_update(data):
