@@ -54,10 +54,21 @@ class DMP:
         self.submit_button = Button(label="Submit")
         self.submit_button.on_click(self.submit_callback)
         
+        self.continue_button = Button(label="Continue")
+        self.continue_button.on_click(self.continue_callback)
+
+        self.done_button = Button(label="Done")
+        self.done_button.on_click(self.done_callback)
+
         # add a button widget and configure with the call back
         self.truncate_button = Button(label="Automatically Truncate")
         self.truncate_button.on_click(self.truncate_callback)
         self.time_range = RangeSlider(title="Truncated Time", value=(self.truncated_start_time,self.truncated_end_time), start=self.trajectory_start_time, end=self.trajectory_end_time, step=0.01)
+
+        self.skill_name = TextInput(title="Skill Name", value='')
+        self.num_basis = Slider(title="Number of Basis Functions", value=4, start=1, end=10, step=1)
+
+        self.dmp_type = RadioButtonGroup(labels=["cartesian", "joint"], active=0)
 
         self.start_time_span = Span(location=self.truncated_start_time,
                               dimension='height', line_color='green',
@@ -70,7 +81,41 @@ class DMP:
         self.time_range.js_link('value', self.start_time_span, 'location', attr_selector=0)
         self.time_range.js_link('value', self.end_time_span, 'location', attr_selector=1)
 
+    def continue_callback(self):
+        self.doc.clear()
+
+        xs = np.tile(self.skill_state_dict['time_since_skill_started'].reshape((1,-1)), (7, 1)).tolist()
+
+        p1 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
+        ys1 = np.transpose(self.cartesian_trajectory).tolist()
+        r1 = p1.multi_line(xs=xs, ys=ys1, color=self.colors_list, line_width=3)
+
+        p2 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
+        ys2 = np.transpose(self.cartesian_trajectory - self.cartesian_trajectory[0,:]).tolist()
+        r2 = p2.multi_line(xs=xs, ys=ys2, color=self.colors_list, line_width=3)
+
+        pose_legend = Legend(items=[
+            LegendItem(label='x', renderers=[r1,r2], index=0),
+            LegendItem(label="y", renderers=[r1,r2], index=1),
+            LegendItem(label="z", renderers=[r1,r2], index=2),
+            LegendItem(label="qw", renderers=[r1,r2], index=3),
+            LegendItem(label="qx", renderers=[r1,r2], index=4),
+            LegendItem(label="qy", renderers=[r1,r2], index=5),
+            LegendItem(label="qz", renderers=[r1,r2], index=6),
+        ], click_policy="mute")
+
+        p1.add_layout(pose_legend)
+        p2.add_layout(pose_legend)
+        
+        # Set up layouts and add to document
+        inputs = column(self.dmp_type, self.skill_name, self.num_basis, self.submit_button)
+        plots = column(p1,p2)
+        self.doc.add_root(column(row(inputs, plots), self.done_button))
+
     def submit_callback(self):
+        pass
+
+    def done_callback(self):
         self.doc.clear()
 
     def truncate_callback(self):
@@ -104,8 +149,8 @@ class DMP:
         p2.add_layout(pose_legend)
         p2.add_layout(self.start_time_span)
         p2.add_layout(self.end_time_span)
-        tab1 = Panel(child=column(p1, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Cartesian Pose")
-        tab2 = Panel(child=column(p2, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Relative Cartesian Pose")
+        tab1 = Panel(child=column(p1, row(self.truncation_threshold, self.truncate_button), self.time_range, self.continue_button, sizing_mode='scale_width'), title="Cartesian Pose")
+        tab2 = Panel(child=column(p2, row(self.truncation_threshold, self.truncate_button), self.time_range, self.continue_button, sizing_mode='scale_width'), title="Relative Cartesian Pose")
 
         p3 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
         ys3 = np.transpose(self.skill_state_dict['q']).tolist()
@@ -130,52 +175,7 @@ class DMP:
         p4.add_layout(joint_legend)
         p4.add_layout(self.start_time_span)
         p4.add_layout(self.end_time_span)
-        tab3 = Panel(child=column(p3, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Joint Position")
-        tab4 = Panel(child=column(p4, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Relative Joint Position")
+        tab3 = Panel(child=column(p3, row(self.truncation_threshold, self.truncate_button), self.time_range, self.continue_button, sizing_mode='scale_width'), title="Joint Position")
+        tab4 = Panel(child=column(p4, row(self.truncation_threshold, self.truncate_button), self.time_range, self.continue_button, sizing_mode='scale_width'), title="Relative Joint Position")
 
         self.doc.add_root(Tabs(tabs=[tab1, tab2, tab3, tab4]))
-
-
-
-# create a callback that adds a number in a random location
-# def callback():
-#     doc.clear()
-
-#     # Set up data
-#     N = 200
-#     x = np.linspace(0, 4*np.pi, N)
-#     y = np.sin(x)
-#     source = ColumnDataSource(data=dict(x=x, y=y))
-
-
-#     # Set up plot
-#     plot = figure(height=400, width=400, title="my sine wave",
-#               tools="crosshair,pan,reset,save,wheel_zoom",
-#               x_range=[0, 4*np.pi], y_range=[-2.5, 2.5])
-
-#     plot.line('x', 'y', source=source, line_width=3, line_alpha=0.6)
-
-#     # Set up callbacks
-#     def update_title(attrname, old, new):
-#         plot.title.text = text.value
-
-#     text = TextInput(title="Skill Name", value='my skill name')
-#     start_time = Slider(title="start_time", value=0.0, start=-5.0, end=5.0, step=0.1)
-#     end_time = Slider(title="end_time", value=1.0, start=-5.0, end=5.0, step=0.1)
-#     phase = Slider(title="phase", value=0.0, start=0.0, end=2*np.pi)
-#     freq = Slider(title="frequency", value=1.0, start=0.1, end=5.1, step=0.1)
-#     button = Button(label="Submit")
-#     button.on_click(submit_callback)
-
-#     text.on_change('value', update_title)
-
-#     radio_button_group = RadioButtonGroup(labels=["cartesian", "joint"], active=0)
-#     radio_button_group.js_on_click(CustomJS(code="""
-#         console.log('radio_button_group: active=' + this.active, this.toString())
-#     """))
-    
-#     # Set up layouts and add to document
-#     inputs = column(radio_button_group, text, start_time, end_time, phase, freq, button)
-#     doc.add_root(column(inputs, plot))
-
-
