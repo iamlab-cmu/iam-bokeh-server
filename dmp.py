@@ -37,7 +37,7 @@ doc = curdoc()
 # for w in [start_time, end_time, phase, freq]:
 #     w.on_change('value', update_data)
 
-state_dict = pickle.load( open( '/home/klz/Documents/iam-skill-server/franka_traj.pkl', "rb" ) )
+state_dict = pickle.load( open( '/home/sony/Documents/iam-web/iam-bokeh-server/franka_traj.pkl', "rb" ) )
 
 cartesian_trajectory = {}
 skill_state_dict = {}
@@ -133,11 +133,11 @@ time_range.js_link('value', end_time_span, 'location', attr_selector=1)
 xs = np.tile(skill_state_dict['time_since_skill_started'].reshape((1,-1)), (7, 1)).tolist()
 colors_list = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan']
 
-p1 = figure(plot_width=1000, plot_height=500, x_range=x_range)
+p1 = figure(plot_width=1000, plot_height=300, x_range=x_range)
 ys1 = np.transpose(cartesian_trajectory).tolist()
 r1 = p1.multi_line(xs=xs, ys=ys1, color=colors_list, line_width=3)
 
-p2 = figure(plot_width=1000, plot_height=500, x_range=x_range)
+p2 = figure(plot_width=1000, plot_height=300, x_range=x_range)
 ys2 = np.transpose(cartesian_trajectory - cartesian_trajectory[0,:]).tolist()
 r2 = p2.multi_line(xs=xs, ys=ys2, color=colors_list, line_width=3)
 
@@ -159,11 +159,11 @@ p2.add_layout(end_time_span)
 tab1 = Panel(child=column(p1, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Cartesian Pose")
 tab2 = Panel(child=column(p2, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Relative Cartesian Pose")
 
-p3 = figure(plot_width=1000, plot_height=500, x_range=x_range)
+p3 = figure(plot_width=1000, plot_height=300, x_range=x_range)
 ys3 = np.transpose(skill_state_dict['q']).tolist()
 r3 = p3.multi_line(xs=xs, ys=ys3, color=colors_list, line_width=3)
 
-p4 = figure(plot_width=1000, plot_height=500, x_range=x_range)
+p4 = figure(plot_width=1000, plot_height=300, x_range=x_range)
 ys4 = np.transpose(skill_state_dict['q']-skill_state_dict['q'][0,:]).tolist()
 r4 = p4.multi_line(xs=xs, ys=ys4, color=colors_list, line_width=3)
 
@@ -186,10 +186,6 @@ tab3 = Panel(child=column(p3, row(truncation_threshold, truncate_button), time_r
 tab4 = Panel(child=column(p4, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Relative Joint Position")
 
 curdoc().add_root(Tabs(tabs=[tab1, tab2, tab3, tab4]))
-
-script = server_document("http://192.168.3.201:5006/dmp")
-print(json.dumps(script))
-#curdoc().title = "Truncating Trajectories"
 
 @gen.coroutine
 def ros_update(data):
