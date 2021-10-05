@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 
 from bokeh.plotting import figure
@@ -6,7 +5,6 @@ from bokeh.models import ColumnDataSource, Column, Button, TextInput
 from bokeh.io import curdoc
 from bokeh.events import Tap
 from bokeh.layouts import column, row
-
 
 from threading import Thread
 import numpy as np
@@ -23,6 +21,9 @@ from dextr_msgs.srv import DEXTRRequest,DEXTRRequestResponse
 from dextr_msgs.msg import Point2D
 import helpers
 import time
+
+import json
+from bokeh.embed import server_document 
 
 rospy.init_node('bokeh_server')
 
@@ -71,7 +72,6 @@ def callback(event):
     removed_point = False
 
     for i in coordList:
-        #print(np.sqrt(np.square(i[0] - Coords[0]) + np.square(i[1] - Coords[1])))
         if np.sqrt(np.square(i[0] - Coords[0]) + np.square(i[1] - Coords[1])) < 0.25:
             coordList.remove(i)
             removed_point = True
@@ -179,7 +179,6 @@ done_button.on_click(done_callback)
 
 text = TextInput(title="Object Name", value='')
 
-#layout=Column(p)
 page_layout=column(p,text, submit_button, done_button)
 
 curdoc().add_root(page_layout)
