@@ -20,7 +20,7 @@ from bokeh.models import ColumnDataSource, Slider, TextInput, Button, RangeSlide
 import json
 from bokeh.embed import server_document 
 
-class DEXTR:
+class DMP:
 
     def __init__(self, doc):
         self.doc = curdoc()
@@ -28,64 +28,66 @@ class DEXTR:
         state_dict = pickle.load( open( '/home/sony/Documents/iam-web/iam-bokeh-server/franka_traj.pkl', "rb" ) )
 
         self.cartesian_trajectory = {}
-        skill_state_dict = {}
+        self.skill_state_dict = {}
+        self.colors_list = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan']
 
         for key in state_dict.keys():
             skill_dict = state_dict[key]
             
             if skill_dict["skill_description"] == "GuideMode":
-                skill_state_dict = skill_dict["skill_state_dict"]
-                self.cartesian_trajectory = process_cartesian_trajectories(skill_state_dict['O_T_EE'], use_quaternions=True, transform_in_row_format=True)
+                self.skill_state_dict = skill_dict["skill_state_dict"]
+                self.cartesian_trajectory = process_cartesian_trajectories(self.skill_state_dict['O_T_EE'], use_quaternions=True, transform_in_row_format=True)
                 
-        trajectory_start_time = 0.0
-        trajectory_end_time = skill_state_dict['time_since_skill_started'][-1]
+        self.trajectory_start_time = 0.0
+        self.trajectory_end_time = self.skill_state_dict['time_since_skill_started'][-1]
 
-        x_range = [trajectory_start_time, trajectory_end_time]
+        self.x_range = [self.trajectory_start_time, self.trajectory_end_time]
 
-        truncated_start_time = trajectory_start_time
-        truncated_end_time = trajectory_end_time
+        self.truncated_start_time = self.trajectory_start_time
+        self.truncated_end_time = self.trajectory_end_time
 
-        def submit_callback(self):
-            doc.clear()
+        self.truncation_threshold = Spinner(title="Truncation Threshold", low=0, high=1, step=0.005, value=0.005)
 
-        # add a button widget and configure with the call back
-        submit_button = Button(label="Submit")
-        submit_button.on_click(submit_callback)
-
-        def truncate_callback():
-            (truncated_start_time, truncated_end_time) = get_start_and_end_times(skill_state_dict['time_since_skill_started'], cartesian_trajectory, skill_state_dict['q'], truncation_threshold.value)
-            start_time_span.location = truncated_start_time
-            end_time_span.location = truncated_end_time
-
-        truncation_threshold = Spinner(title="Truncation Threshold", low=0, high=1, step=0.005, value=0.005)
-
-        (truncated_start_time, truncated_end_time) = get_start_and_end_times(skill_state_dict['time_since_skill_started'], cartesian_trajectory, skill_state_dict['q'], truncation_threshold.value)
+        (self.truncated_start_time, self.truncated_end_time) = get_start_and_end_times(self.skill_state_dict['time_since_skill_started'], self.cartesian_trajectory, self.skill_state_dict['q'], self.truncation_threshold.value)
 
         # add a button widget and configure with the call back
-        truncate_button = Button(label="Automatically Truncate")
-        truncate_button.on_click(truncate_callback)
-        time_range = RangeSlider(title="Truncated Time", value=(truncated_start_time,truncated_end_time), start=trajectory_start_time, end=trajectory_end_time, step=0.01)
+        self.submit_button = Button(label="Submit")
+        self.submit_button.on_click(self.submit_callback)
+        
+        # add a button widget and configure with the call back
+        self.truncate_button = Button(label="Automatically Truncate")
+        self.truncate_button.on_click(self.truncate_callback)
+        self.time_range = RangeSlider(title="Truncated Time", value=(self.truncated_start_time,self.truncated_end_time), start=self.trajectory_start_time, end=self.trajectory_end_time, step=0.01)
 
-        start_time_span = Span(location=truncated_start_time,
+        self.start_time_span = Span(location=self.truncated_start_time,
                               dimension='height', line_color='green',
                               line_width=3)
 
-        end_time_span = Span(location=truncated_end_time,
+        self.end_time_span = Span(location=self.truncated_end_time,
                               dimension='height', line_color='red',
                               line_width=3)
-        time_range.js_link('value', start_time_span, 'location', attr_selector=0)
-        time_range.js_link('value', end_time_span, 'location', attr_selector=1)
 
-        xs = np.tile(skill_state_dict['time_since_skill_started'].reshape((1,-1)), (7, 1)).tolist()
-        colors_list = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan']
+        self.time_range.js_link('value', self.start_time_span, 'location', attr_selector=0)
+        self.time_range.js_link('value', self.end_time_span, 'location', attr_selector=1)
 
-        p1 = figure(plot_width=1000, plot_height=300, x_range=x_range)
-        ys1 = np.transpose(cartesian_trajectory).tolist()
-        r1 = p1.multi_line(xs=xs, ys=ys1, color=colors_list, line_width=3)
+    def submit_callback(self):
+        self.doc.clear()
 
-        p2 = figure(plot_width=1000, plot_height=300, x_range=x_range)
-        ys2 = np.transpose(cartesian_trajectory - cartesian_trajectory[0,:]).tolist()
-        r2 = p2.multi_line(xs=xs, ys=ys2, color=colors_list, line_width=3)
+    def truncate_callback(self):
+        (self.truncated_start_time, self.truncated_end_time) = get_start_and_end_times(self.skill_state_dict['time_since_skill_started'], self.cartesian_trajectory, self.skill_state_dict['q'], self.truncation_threshold.value)
+        self.start_time_span.location = self.truncated_start_time
+        self.end_time_span.location = self.truncated_end_time
+        
+    def handle_dmp_training_request(self, request):
+        xs = np.tile(self.skill_state_dict['time_since_skill_started'].reshape((1,-1)), (7, 1)).tolist()
+
+        p1 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
+        ys1 = np.transpose(self.cartesian_trajectory).tolist()
+        r1 = p1.multi_line(xs=xs, ys=ys1, color=self.colors_list, line_width=3)
+
+        p2 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
+        ys2 = np.transpose(self.cartesian_trajectory - self.cartesian_trajectory[0,:]).tolist()
+        r2 = p2.multi_line(xs=xs, ys=ys2, color=self.colors_list, line_width=3)
 
         pose_legend = Legend(items=[
             LegendItem(label='x', renderers=[r1,r2], index=0),
@@ -97,21 +99,21 @@ class DEXTR:
             LegendItem(label="qz", renderers=[r1,r2], index=6),
         ], click_policy="mute")
         p1.add_layout(pose_legend)
-        p1.add_layout(start_time_span)
-        p1.add_layout(end_time_span)
+        p1.add_layout(self.start_time_span)
+        p1.add_layout(self.end_time_span)
         p2.add_layout(pose_legend)
-        p2.add_layout(start_time_span)
-        p2.add_layout(end_time_span)
-        tab1 = Panel(child=column(p1, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Cartesian Pose")
-        tab2 = Panel(child=column(p2, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Relative Cartesian Pose")
+        p2.add_layout(self.start_time_span)
+        p2.add_layout(self.end_time_span)
+        tab1 = Panel(child=column(p1, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Cartesian Pose")
+        tab2 = Panel(child=column(p2, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Relative Cartesian Pose")
 
-        p3 = figure(plot_width=1000, plot_height=300, x_range=x_range)
-        ys3 = np.transpose(skill_state_dict['q']).tolist()
-        r3 = p3.multi_line(xs=xs, ys=ys3, color=colors_list, line_width=3)
+        p3 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
+        ys3 = np.transpose(self.skill_state_dict['q']).tolist()
+        r3 = p3.multi_line(xs=xs, ys=ys3, color=self.colors_list, line_width=3)
 
-        p4 = figure(plot_width=1000, plot_height=300, x_range=x_range)
-        ys4 = np.transpose(skill_state_dict['q']-skill_state_dict['q'][0,:]).tolist()
-        r4 = p4.multi_line(xs=xs, ys=ys4, color=colors_list, line_width=3)
+        p4 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
+        ys4 = np.transpose(self.skill_state_dict['q']-self.skill_state_dict['q'][0,:]).tolist()
+        r4 = p4.multi_line(xs=xs, ys=ys4, color=self.colors_list, line_width=3)
 
         joint_legend = Legend(items=[
             LegendItem(label='1', renderers=[r3,r4], index=0),
@@ -123,13 +125,13 @@ class DEXTR:
             LegendItem(label="7", renderers=[r3,r4], index=6),
         ], click_policy="mute")
         p3.add_layout(joint_legend)
-        p3.add_layout(start_time_span)
-        p3.add_layout(end_time_span)
+        p3.add_layout(self.start_time_span)
+        p3.add_layout(self.end_time_span)
         p4.add_layout(joint_legend)
-        p4.add_layout(start_time_span)
-        p4.add_layout(end_time_span)
-        tab3 = Panel(child=column(p3, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Joint Position")
-        tab4 = Panel(child=column(p4, row(truncation_threshold, truncate_button), time_range, submit_button, sizing_mode='scale_width'), title="Relative Joint Position")
+        p4.add_layout(self.start_time_span)
+        p4.add_layout(self.end_time_span)
+        tab3 = Panel(child=column(p3, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Joint Position")
+        tab4 = Panel(child=column(p4, row(self.truncation_threshold, self.truncate_button), self.time_range, self.submit_button, sizing_mode='scale_width'), title="Relative Joint Position")
 
         self.doc.add_root(Tabs(tabs=[tab1, tab2, tab3, tab4]))
 
