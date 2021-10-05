@@ -37,7 +37,7 @@ pub = rospy.Publisher('masks', Image, queue_size=10)
 # see the same document.
 doc = curdoc()
 
-im = cv2.imread('/home/klz/unlabeled_food_images/tomato_8_4_ending_grasp_image.png')
+im = cv2.imread('/home/sony/new_yolo_food_photos/image3.png')
 
 M, N, _ = im.shape
 img = np.empty((M, N), dtype=np.uint32)

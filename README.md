@@ -1,3 +1,14 @@
 # iam-bokeh-server
 
-bokeh serve --allow-websocket-origin=192.168.3.201:5006 dmp.py
+## Installation
+
+```
+pip install bokeh
+```
+
+## Running Instructions
+1. Figure out your ip address and substitute it below.
+
+```
+bokeh serve --allow-websocket-origin=<your ip address>:5006 bokeh_server.py
+```
