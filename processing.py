@@ -89,34 +89,25 @@ def get_start_and_end_times(trajectory_times, cartesian_trajectory, joint_trajec
     return trajectory_times[start_trajectory_index], trajectory_times[end_trajectory_index]
 
 
-def truncate_trajectory(trajectory_times, cartesian_trajectory, joint_trajectory, threshold, return_indices=False):
+def truncate_trajectory(trajectory_times, cartesian_trajectory, joint_trajectory, start_time, end_time):
     
     num_trajectory_points = trajectory_times.shape[0]
     start_trajectory_index = 0
     end_trajectory_index = num_trajectory_points
         
-    previous_robot_pose = cartesian_trajectory[0,:]
-    for i in range(1,num_trajectory_points):
-        current_robot_pose = cartesian_trajectory[i,:]
-        if(np.linalg.norm(current_robot_pose - previous_robot_pose) > threshold):
-            start_trajectory_index = i - 1
+    for i in range(0,num_trajectory_points):
+        if(start_time - trajectory_times[i]) <= 0:
+            start_trajectory_index = i 
             break
-        previous_robot_pose = current_robot_pose
 
-                
-    previous_robot_pose = cartesian_trajectory[-1,:]
     for i in reversed(range(0,num_trajectory_points-1)):
-        current_robot_pose = cartesian_trajectory[i,:]
-        if(np.linalg.norm(current_robot_pose - previous_robot_pose) > threshold):
-            end_trajectory_index = i + 2
+        if(end_time - trajectory_times[i]) >= 0:
+            end_trajectory_index = i
             break
 
     truncated_trajectory_times = trajectory_times[start_trajectory_index:end_trajectory_index]
-    truncated_trajectory_times -= trajectory_times[0]
+    truncated_trajectory_times -= truncated_trajectory_times[0]
     truncated_cartesian_trajectory = cartesian_trajectory[start_trajectory_index:end_trajectory_index,:]
     truncated_joint_trajectory = joint_trajectory[start_trajectory_index:end_trajectory_index,:]
         
-    if return_indices:
-        return start_trajectory_index, end_trajectory_index
-    else:
-        return truncated_trajectory_times, truncated_cartesian_trajectory, truncated_joint_trajectory
+    return truncated_trajectory_times, truncated_cartesian_trajectory, truncated_joint_trajectory

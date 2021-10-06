@@ -34,7 +34,7 @@ class DEXTR:
         print('DEXTR Service is Ready.')
         self.dextr_client = rospy.ServiceProxy('dextr', DEXTRRequest)
 
-        self.im = cv2.imread('/home/sony/new_yolo_food_photos/image3.png')
+        self.im = cv2.imread('/home/klz/image3.png')
         self.M, self.N, _ = self.im.shape
         self.img = np.empty((self.M, self.N), dtype=np.uint32)
 
@@ -52,7 +52,7 @@ class DEXTR:
 
         self.TOOLS = "tap"
 
-        self.p = figure(title='Label the Image by tapping on 4 extreme points. You can press on a point again to remove it. Then type in the name of the object and press submit. Press Done when you have finished labeling.',
+        self.p = figure(title='',
                    tools=self.TOOLS,width=640,height=480,
                    x_axis_type=None, y_axis_type=None)
 
@@ -131,7 +131,7 @@ class DEXTR:
 
     def submit_callback(self):
         if len(self.coordList) == 4:    
-            self.p.title.text = 'Label the Image by tapping on 4 extreme points. You can press on a point again to remove it. Then type in the name of the object and press submit. Press Done when you have finished labeling.'
+            self.p.title.text = ''
             
             points = []
             for i in self.coordList:
