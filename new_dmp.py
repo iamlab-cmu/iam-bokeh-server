@@ -25,7 +25,7 @@ class DMP:
     def __init__(self, doc):
         self.doc = curdoc()
 
-        state_dict = pickle.load( open( '/home/klz/Documents/iam-bokeh-server/franka_traj.pkl', "rb" ) )
+        state_dict = pickle.load( open( '/home/sony/Documents/iam-web/iam-bokeh-server/franka_traj.pkl', "rb" ) )
 
         self.cartesian_trajectory = {}
         self.skill_state_dict = {}
@@ -125,7 +125,8 @@ class DMP:
 
         dmp_pos_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
         weights_pos, _ = dmp_pos_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
-        self.quat_alpha_phase = 1.0
+        self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+        self.quat_alpha_phase = self.truncated_trajectory_times[-1]
         quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
         quat_beta = quat_alpha / 4.0
         dmp_quat_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
@@ -144,7 +145,7 @@ class DMP:
             trajectory[-1, 3:], 
             self.rollout_dt,
             traj_time=traj_time,
-            quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-2.0)
+            quat_canonical_goal_time=self.quat_canonical_goal_time
         )   
 
         self.p2 = figure(plot_width=1000, plot_height=300, x_range=x_range)
@@ -181,7 +182,8 @@ class DMP:
 
             dmp_pos_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
             weights_pos, _ = dmp_pos_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
-            self.quat_alpha_phase = 0.1
+            self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+            self.quat_alpha_phase = self.truncated_trajectory_times[-1]
             quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
             quat_beta = quat_alpha / 4.0
             dmp_quat_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
@@ -200,7 +202,7 @@ class DMP:
                 trajectory[-1, 3:], 
                 self.rollout_dt,
                 traj_time=traj_time,
-                quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+                quat_canonical_goal_time=self.quat_canonical_goal_time
             )   
 
             new_trajectory_times = np.arange(y_pos.shape[0]) * self.rollout_dt
@@ -249,7 +251,8 @@ class DMP:
 
             dmp_pos_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
             weights_pos, _ = dmp_pos_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
-            self.quat_alpha_phase = 0.1
+            self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+            self.quat_alpha_phase = self.truncated_trajectory_times[-1]
             quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
             quat_beta = quat_alpha / 4.0
             dmp_quat_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
@@ -268,7 +271,7 @@ class DMP:
                 trajectory[-1, 3:], 
                 self.rollout_dt,
                 traj_time=traj_time,
-                quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+                quat_canonical_goal_time=self.quat_canonical_goal_time
             )   
 
             new_trajectory_times = np.arange(y_pos.shape[0]) * self.rollout_dt

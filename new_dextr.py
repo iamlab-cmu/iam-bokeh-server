@@ -34,7 +34,7 @@ class DEXTR:
         print('DEXTR Service is Ready.')
         self.dextr_client = rospy.ServiceProxy('dextr', DEXTRRequest)
 
-        self.im = cv2.imread('/home/klz/image3.png')
+        self.im = cv2.imread('/home/sony/new_yolo_food_photos/image3.png')
         self.M, self.N, _ = self.im.shape
         self.img = np.empty((self.M, self.N), dtype=np.uint32)
 
