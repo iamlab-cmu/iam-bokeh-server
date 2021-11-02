@@ -34,15 +34,9 @@ class DEXTR:
         print('DEXTR Service is Ready.')
         self.dextr_client = rospy.ServiceProxy('dextr', DEXTRRequest)
 
-        self.im = cv2.imread('/home/klz/image3.png')
-        self.M, self.N, _ = self.im.shape
+        self.M = 640
+        self.N = 480
         self.img = np.empty((self.M, self.N), dtype=np.uint32)
-
-        view = self.img.view(dtype=np.uint8).reshape((self.M, self.N, 4))
-        view[:,:,0] = self.im[:,:,2] # copy red channel
-        view[:,:,1] = self.im[:,:,1] # copy blue channel
-        view[:,:,2] = self.im[:,:,0] # copy green channel
-        view[:,:,3] = 255
 
         self.img = self.img[::-1] # flip for Bokeh
 
@@ -168,6 +162,20 @@ class DEXTR:
         self.object_names = []
         self.masks = []
         self.coordList=[]
+
+        self.im = self.bridge.imgmsg_to_cv2(request.image)
+        self.M, self.N, _ = self.im.shape
+        self.img = np.empty((self.M, self.N), dtype=np.uint32)
+
+        view = self.img.view(dtype=np.uint8).reshape((self.M, self.N, 4))
+        view[:,:,0] = self.im[:,:,2] # copy red channel
+        view[:,:,1] = self.im[:,:,1] # copy blue channel
+        view[:,:,2] = self.im[:,:,0] # copy green channel
+        view[:,:,3] = 255
+
+        self.img = self.img[::-1] # flip for Bokeh
+
+        self.img_source = ColumnDataSource({'image': [self.img]})
 
         self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
 
