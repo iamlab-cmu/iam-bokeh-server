@@ -19,13 +19,15 @@ from functools import partial
 
 from dextr_msgs.srv import DEXTRRequest,DEXTRRequestResponse
 from dextr_msgs.msg import Point2D
+from bokeh_server_msgs.msg import Response
 import helpers
 import time
 
 class DEXTR:
 
-    def __init__(self, doc):
+    def __init__(self, doc, pub):
         self.doc = doc
+        self.pub = pub
         self.bridge = CvBridge()
 
         print('Waiting for DEXTR Service.')
@@ -163,26 +165,32 @@ class DEXTR:
         self.masks = []
         self.coordList=[]
 
-        self.im = self.bridge.imgmsg_to_cv2(request.image)
-        self.M, self.N, _ = self.im.shape
-        self.img = np.empty((self.M, self.N), dtype=np.uint32)
+        print('Received Image')
+        try:
+            self.im = self.bridge.imgmsg_to_cv2(request.image)
 
-        view = self.img.view(dtype=np.uint8).reshape((self.M, self.N, 4))
-        view[:,:,0] = self.im[:,:,2] # copy red channel
-        view[:,:,1] = self.im[:,:,1] # copy blue channel
-        view[:,:,2] = self.im[:,:,0] # copy green channel
-        view[:,:,3] = 255
+            print('Converted Image')
+            self.M, self.N, _ = self.im.shape
+            self.img = np.empty((self.M, self.N), dtype=np.uint32)
 
-        self.img = self.img[::-1] # flip for Bokeh
+            view = self.img.view(dtype=np.uint8).reshape((self.M, self.N, 4))
+            view[:,:,0] = self.im[:,:,2] # copy red channel
+            view[:,:,1] = self.im[:,:,1] # copy blue channel
+            view[:,:,2] = self.im[:,:,0] # copy green channel
+            view[:,:,3] = 255
 
-        self.img_source = ColumnDataSource({'image': [self.img]})
+            self.img = self.img[::-1] # flip for Bokeh
 
-        self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
+            self.img_source = ColumnDataSource({'image': [self.img]})
 
-        self.p.circle(source=self.source,x='x',y='y', radius=0.15, alpha=0.5, fill_color='red') 
+            self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
 
-        self.p.on_event(Tap, self.tap_callback)
+            self.p.circle(source=self.source,x='x',y='y', radius=0.15, alpha=0.5, fill_color='red') 
 
-        self.page_layout=column(self.p, self.text, self.submit_button, self.done_button)
+            self.p.on_event(Tap, self.tap_callback)
 
-        self.doc.add_root(self.page_layout)
+            self.page_layout=column(self.p, self.text, self.submit_button, self.done_button)
+
+            self.doc.add_root(self.page_layout)
+        except Exception as e: 
+            print(e)

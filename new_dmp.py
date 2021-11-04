@@ -14,6 +14,7 @@ import numpy as np
 from visualization import *
 from processing import *
 
+from bokeh_server_msgs.msg import Response
 from bokeh.layouts import column, row
 from bokeh.core.properties import value
 from bokeh.models import ColumnDataSource, Slider, TextInput, Button, RangeSlider, Panel, Tabs, Legend, LegendItem, Span, RadioButtonGroup, Spinner
@@ -22,8 +23,9 @@ from dmp_class import DMPTrajectory
 
 class DMP:
 
-    def __init__(self, doc):
+    def __init__(self, doc, pub):
         self.doc = curdoc()
+        self.pub = pub
 
         state_dict = pickle.load( open( '/home/sony/Documents/iam-web/iam-bokeh-server/franka_traj.pkl', "rb" ) )
 

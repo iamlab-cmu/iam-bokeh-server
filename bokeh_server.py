@@ -28,34 +28,34 @@ import cv2
 
 from sensor_msgs.msg import Image
 
-from dextr_msgs.srv import DEXTRRequest,DEXTRRequestResponse
-from dextr_msgs.msg import Point2D
 import helpers
 
 from new_dextr import DEXTR
 from new_dmp import DMP
+from point_goals import PointGoal
 
 rospy.init_node('bokeh_server')
 
 pub = rospy.Publisher('bokeh_response', Response, queue_size=10)
-rospy.wait_for_service('dextr')
-
-dextr_client = rospy.ServiceProxy('dextr', DEXTRRequest)
 
 # This is important! Save curdoc() to make sure all threads
 # see the same document.
 doc = curdoc()
 
-dextr = DEXTR(doc)
-dmp = DMP(doc)
+dextr = DEXTR(doc, pub)
+dmp = DMP(doc, pub)
+point_goal = PointGoal(doc, pub)
 
 @gen.coroutine
 def handle_request(msg):
     doc.clear()
+    print("Received message with display_type" + str(msg.display_type))
     if msg.display_type == 0:
         dmp.handle_dmp_training_request(msg)
     elif msg.display_type == 1:
         dextr.handle_dextr_request(msg)
+    elif msg.display_type == 2:
+        point_goal.handle_point_goal_request(msg)
 
 def ros_handler():
 
@@ -65,7 +65,6 @@ def ros_handler():
             doc.add_next_tick_callback(partial(handle_request, msg=request_msg))
         except:
             pass
-        rospy.sleep(1)
 
 thread = Thread(target=ros_handler)
 thread.start()
