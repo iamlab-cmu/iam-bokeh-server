@@ -130,30 +130,21 @@ class DEXTR:
         self.page_layout.children[3] = self.done_button
 
     def done_callback(self):
-        print('Pressed Done')
         self.doc.clear()
-
-        print('1')
 
         response_msg = Response()
         response_msg.object_names = self.object_names
-        print('2')
         response_msg.bounding_boxes = self.bounding_boxes
-        print('3')
         mask_image = np.zeros(shape=[self.M, self.N, 3], dtype=np.uint8)
-        print('4')
         num_masks = len(self.masks)
 
-        print('5')
         # Maximum of 24 masks on an image.
         for i in range(num_masks):
             mask_image[:,:,int(i/8)] += self.masks[i].astype(np.uint8) * (2 ** (i % 8))
-        print('6')
         try:
             response_msg.masks = self.bridge.cv2_to_imgmsg(mask_image)
         except Exception as e:
             print(e)
-        print('7')
         self.pub.publish(response_msg)
 
 
@@ -199,12 +190,10 @@ class DEXTR:
         self.bounding_boxes = []
         self.coordList=[]
         self.bounding_box = []
-
-        print('Received Image')
+        
         try:
             self.im = self.bridge.imgmsg_to_cv2(request.image)
 
-            print('Converted Image')
             self.M, self.N, _ = self.im.shape
             self.img = np.empty((self.M, self.N), dtype=np.uint32)
 

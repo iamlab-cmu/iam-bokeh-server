@@ -52,7 +52,6 @@ point_goal = PointGoal(doc, pub, bridge)
 @gen.coroutine
 def handle_request(msg):
     doc.clear()
-    print("Received message with display_type" + str(msg.display_type))
     if msg.display_type == 0:
         dmp.handle_dmp_training_request(msg)
     elif msg.display_type == 1:
