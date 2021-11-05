@@ -24,10 +24,10 @@ import time
 
 class PointGoal:
 
-    def __init__(self, doc, pub):
+    def __init__(self, doc, pub, bridge):
         self.doc = doc
         self.pub = pub
-        self.bridge = CvBridge()
+        self.bridge = bridge
 
         self.M = 640
         self.N = 480

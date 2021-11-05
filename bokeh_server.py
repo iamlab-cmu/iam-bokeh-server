@@ -25,6 +25,7 @@ from bokeh.events import Tap
 from bokeh.layouts import column, row
 
 import cv2
+from cv_bridge import CvBridge
 
 from sensor_msgs.msg import Image
 
@@ -42,9 +43,11 @@ pub = rospy.Publisher('bokeh_response', Response, queue_size=10)
 # see the same document.
 doc = curdoc()
 
-dextr = DEXTR(doc, pub)
+bridge = CvBridge()
+
 dmp = DMP(doc, pub)
-point_goal = PointGoal(doc, pub)
+dextr = DEXTR(doc, pub, bridge)
+point_goal = PointGoal(doc, pub, bridge)
 
 @gen.coroutine
 def handle_request(msg):

@@ -19,16 +19,16 @@ from functools import partial
 
 from dextr_msgs.srv import DEXTRRequest,DEXTRRequestResponse
 from dextr_msgs.msg import Point2D
-from bokeh_server_msgs.msg import Response
+from bokeh_server_msgs.msg import Response, BBox
 import helpers
 import time
 
 class DEXTR:
 
-    def __init__(self, doc, pub):
+    def __init__(self, doc, pub, bridge):
         self.doc = doc
         self.pub = pub
-        self.bridge = CvBridge()
+        self.bridge = bridge
 
         print('Waiting for DEXTR Service.')
         rospy.wait_for_service('dextr')
@@ -72,7 +72,9 @@ class DEXTR:
 
         self.object_names = []
         self.masks = []
+        self.bounding_boxes = []
         self.coordList=[]
+        self.bounding_box = []
 
         print('Done Initializing DEXTR')
 
@@ -113,29 +115,59 @@ class DEXTR:
             self.img_source.data = {'image': [new_img]}
 
         self.page_layout.children[2] = self.submit_button
+        self.page_layout.children[3] = self.done_button
 
     def continue_callback(self):
         self.coordList.clear()
         self.object_names.append(self.text.value)
+        bbox = BBox()
+        bbox.bounding_box = self.bounding_box
+        self.bounding_boxes.append(bbox)
         self.text.value = ''
         self.source.data = dict(x=[], y=[])
 
         self.page_layout.children[2] = self.submit_button
+        self.page_layout.children[3] = self.done_button
 
     def done_callback(self):
+        print('Pressed Done')
         self.doc.clear()
+
+        print('1')
+
+        response_msg = Response()
+        response_msg.object_names = self.object_names
+        print('2')
+        response_msg.bounding_boxes = self.bounding_boxes
+        print('3')
+        mask_image = np.zeros(shape=[self.M, self.N, 3], dtype=np.uint8)
+        print('4')
+        num_masks = len(self.masks)
+
+        print('5')
+        # Maximum of 24 masks on an image.
+        for i in range(num_masks):
+            mask_image[:,:,int(i/8)] += self.masks[i].astype(np.uint8) * (2 ** (i % 8))
+        print('6')
+        try:
+            response_msg.masks = self.bridge.cv2_to_imgmsg(mask_image)
+        except Exception as e:
+            print(e)
+        print('7')
+        self.pub.publish(response_msg)
+
 
     def submit_callback(self):
         if len(self.coordList) == 4:    
             self.p.title.text = ''
             
-            points = []
+            self.bounding_box = []
             for i in self.coordList:
-                points.append(Point2D(int(i[0]*(self.N/10.0)), int(self.M-i[1]*(self.M/10.0))))
+                self.bounding_box.append(Point2D(int(i[0]*(self.N/10.0)), int(self.M-i[1]*(self.M/10.0))))
 
             sensor_image = self.bridge.cv2_to_imgmsg(self.im, "bgr8")
 
-            resp = self.dextr_client(sensor_image, points)
+            resp = self.dextr_client(sensor_image, self.bounding_box)
 
             self.masks.append(np.array(self.bridge.imgmsg_to_cv2(resp.mask) > 0))
 
@@ -155,7 +187,8 @@ class DEXTR:
 
             self.img_source.data = {'image': [new_img]}
 
-            self.page_layout.children[2] = row(self.redo_button, self.continue_button)
+            self.page_layout.children[2] = self.redo_button
+            self.page_layout.children[3] = self.continue_button
         else:
             self.p.title.text = 'Please click on 4 extreme points before pressing the Submit Button.'
 
@@ -163,7 +196,9 @@ class DEXTR:
 
         self.object_names = []
         self.masks = []
+        self.bounding_boxes = []
         self.coordList=[]
+        self.bounding_box = []
 
         print('Received Image')
         try:
