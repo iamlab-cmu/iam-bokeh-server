@@ -1,0 +1,3 @@
+[submodule "catkin_ws/src/bokeh-server-msgs"]
+	path = catkin_ws/src/bokeh-server-msgs
+	url = https://github.com/iamlab-cmu/bokeh-server-msgs.git
