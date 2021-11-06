@@ -17,7 +17,8 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from functools import partial
 
-from bokeh_server_msgs.msg import Point2D, Response
+from bokeh_server_msgs.msg import Response
+from iam_common_msgs.msg import Int32Point2D
 
 import helpers
 import time
@@ -76,7 +77,7 @@ class PointGoal:
 
         response_msg = Response()
         for i in self.coordList:
-            response_msg.desired_positions.append(Point2D(int(i[0]*(self.N/10.0)), int(self.M-i[1]*(self.M/10.0))))
+            response_msg.desired_positions.append(Int32Point2D(int(i[0]*(self.N/10.0)), int(self.M-i[1]*(self.M/10.0))))
 
         self.pub.publish(response_msg)
 

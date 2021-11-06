@@ -19,7 +19,8 @@ from functools import partial
 
 from dextr_msgs.srv import DEXTRRequest,DEXTRRequestResponse
 from dextr_msgs.msg import Point2D
-from bokeh_server_msgs.msg import Response, BBox
+from bokeh_server_msgs.msg import Response
+from iam_common_msgs.msg import BBox
 import helpers
 import time
 
@@ -121,7 +122,10 @@ class DEXTR:
         self.coordList.clear()
         self.object_names.append(self.text.value)
         bbox = BBox()
-        bbox.bounding_box = self.bounding_box
+        bbox.min_x = np.min([self.bounding_box[0].x, self.bounding_box[1].x, self.bounding_box[2].x, self.bounding_box[3].x])
+        bbox.min_y = np.min([self.bounding_box[0].y, self.bounding_box[1].y, self.bounding_box[2].y, self.bounding_box[3].y])
+        bbox.max_x = np.max([self.bounding_box[0].x, self.bounding_box[1].x, self.bounding_box[2].x, self.bounding_box[3].x])
+        bbox.max_y = np.max([self.bounding_box[0].y, self.bounding_box[1].y, self.bounding_box[2].y, self.bounding_box[3].y])
         self.bounding_boxes.append(bbox)
         self.text.value = ''
         self.source.data = dict(x=[], y=[])
