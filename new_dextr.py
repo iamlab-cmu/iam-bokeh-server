@@ -76,6 +76,7 @@ class DEXTR:
         self.bounding_boxes = []
         self.coordList=[]
         self.bounding_box = []
+        self.screen_cleared = True
 
         print('Done Initializing DEXTR')
 
@@ -150,6 +151,25 @@ class DEXTR:
         except Exception as e:
             print(e)
         self.pub.publish(response_msg)
+        self.screen_cleared = True
+
+    def next_image_callback(self):
+
+        response_msg = Response()
+        response_msg.object_names = self.object_names
+        response_msg.bounding_boxes = self.bounding_boxes
+        mask_image = np.zeros(shape=[self.M, self.N, 3], dtype=np.uint8)
+        num_masks = len(self.masks)
+
+        # Maximum of 24 masks on an image.
+        for i in range(num_masks):
+            mask_image[:,:,int(i/8)] += self.masks[i].astype(np.uint8) * (2 ** (i % 8))
+        try:
+            response_msg.masks = self.bridge.cv2_to_imgmsg(mask_image)
+        except Exception as e:
+            print(e)
+        self.pub.publish(response_msg)
+        self.screen_cleared = False
 
 
     def submit_callback(self):
@@ -209,16 +229,19 @@ class DEXTR:
 
             self.img = self.img[::-1] # flip for Bokeh
 
-            self.img_source = ColumnDataSource({'image': [self.img]})
+            if self.screen_cleared:
+                self.img_source = ColumnDataSource({'image': [self.img]})
 
-            self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
+                self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
 
-            self.p.circle(source=self.source,x='x',y='y', radius=0.15, alpha=0.5, fill_color='red') 
+                self.p.circle(source=self.source,x='x',y='y', radius=0.15, alpha=0.5, fill_color='red') 
 
-            self.p.on_event(Tap, self.tap_callback)
+                self.p.on_event(Tap, self.tap_callback)
 
-            self.page_layout=column(self.p, self.text, self.submit_button, self.done_button)
+                self.page_layout=column(self.p, self.text, self.submit_button, self.done_button)
 
-            self.doc.add_root(self.page_layout)
+                self.doc.add_root(self.page_layout)
+            else:
+                self.img_source.data = {'image': [self.img]}
         except Exception as e: 
             print(e)
