@@ -66,6 +66,10 @@ class DEXTR:
         self.submit_button.on_click(self.submit_callback)
 
         # add a button widget and configure with the call back
+        self.next_image_button = Button(label="Next Image")
+        self.next_image_button.on_click(self.next_image_callback)
+
+        # add a button widget and configure with the call back
         self.done_button = Button(label="Done")
         self.done_button.on_click(self.done_callback)
 
@@ -76,7 +80,6 @@ class DEXTR:
         self.bounding_boxes = []
         self.coordList=[]
         self.bounding_box = []
-        self.screen_cleared = True
 
         print('Done Initializing DEXTR')
 
@@ -117,7 +120,7 @@ class DEXTR:
             self.img_source.data = {'image': [new_img]}
 
         self.page_layout.children[2] = self.submit_button
-        self.page_layout.children[3] = self.done_button
+        self.page_layout.children[3] = row(self.next_image_button, self.done_button)
 
     def continue_callback(self):
         self.coordList.clear()
@@ -132,7 +135,7 @@ class DEXTR:
         self.source.data = dict(x=[], y=[])
 
         self.page_layout.children[2] = self.submit_button
-        self.page_layout.children[3] = self.done_button
+        self.page_layout.children[3] = row(self.next_image_button, self.done_button)
 
     def done_callback(self):
         self.doc.clear()
@@ -140,6 +143,7 @@ class DEXTR:
         response_msg = Response()
         response_msg.object_names = self.object_names
         response_msg.bounding_boxes = self.bounding_boxes
+        response_msg.request_next_image = False
         mask_image = np.zeros(shape=[self.M, self.N, 3], dtype=np.uint8)
         num_masks = len(self.masks)
 
@@ -151,13 +155,14 @@ class DEXTR:
         except Exception as e:
             print(e)
         self.pub.publish(response_msg)
-        self.screen_cleared = True
 
     def next_image_callback(self):
+        self.doc.clear()
 
         response_msg = Response()
         response_msg.object_names = self.object_names
         response_msg.bounding_boxes = self.bounding_boxes
+        response_msg.request_next_image = True
         mask_image = np.zeros(shape=[self.M, self.N, 3], dtype=np.uint8)
         num_masks = len(self.masks)
 
@@ -169,8 +174,6 @@ class DEXTR:
         except Exception as e:
             print(e)
         self.pub.publish(response_msg)
-        self.screen_cleared = False
-
 
     def submit_callback(self):
         if len(self.coordList) == 4:    
@@ -209,13 +212,14 @@ class DEXTR:
 
     def handle_dextr_request(self, request):
 
-        self.object_names = []
-        self.masks = []
-        self.bounding_boxes = []
-        self.coordList=[]
-        self.bounding_box = []
+        self.object_names.clear()
+        self.masks.clear()
+        self.bounding_boxes.clear()
+        self.coordList.clear()
+        self.bounding_box.clear()
         
         try:
+            print('received image')
             self.im = self.bridge.imgmsg_to_cv2(request.image)
 
             self.M, self.N, _ = self.im.shape
@@ -229,19 +233,17 @@ class DEXTR:
 
             self.img = self.img[::-1] # flip for Bokeh
 
-            if self.screen_cleared:
-                self.img_source = ColumnDataSource({'image': [self.img]})
+            self.img_source = ColumnDataSource({'image': [self.img]})
 
-                self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
+            self.p.image_rgba(image='image', x=0, y=0, dw=10, dh=10, source=self.img_source)
 
-                self.p.circle(source=self.source,x='x',y='y', radius=0.15, alpha=0.5, fill_color='red') 
+            self.p.circle(source=self.source,x='x',y='y', radius=0.15, alpha=0.5, fill_color='red') 
 
-                self.p.on_event(Tap, self.tap_callback)
+            self.p.on_event(Tap, self.tap_callback)
 
-                self.page_layout=column(self.p, self.text, self.submit_button, self.done_button)
+            self.page_layout=column(self.p, self.text, self.submit_button, row(self.next_image_button, self.done_button))
 
-                self.doc.add_root(self.page_layout)
-            else:
-                self.img_source.data = {'image': [self.img]}
+            self.doc.add_root(self.page_layout)
+
         except Exception as e: 
             print(e)
