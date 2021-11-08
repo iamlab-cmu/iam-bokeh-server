@@ -76,6 +76,7 @@ class PointGoal:
         self.doc.clear()
 
         response_msg = Response()
+        response_msg.object_names.append(self.text.value)
         for i in self.coordList:
             response_msg.desired_positions.append(Int32Point2D(int(i[0]*(self.N/10.0)), int(self.M-i[1]*(self.M/10.0))))
 
