@@ -477,8 +477,8 @@ class DMPTrajectory(object):
         # which is necessary to drive the system to a stable state.
         if quat_canonical_goal_time is None:
             quat_canonical_goal_time = times[-1]
-        else:
-            assert times[-1] > quat_canonical_goal_time, "Trajectory duration should be larger than canonical system being set to 0."
+        # else:
+        #     assert times[-1] > quat_canonical_goal_time, "Trajectory duration should be larger than canonical system being set to 0."
 
         for i in range(1, traj_time):
             next_q_quat, qd_val, qdd_val, x = self.quaternion_dmp_step(

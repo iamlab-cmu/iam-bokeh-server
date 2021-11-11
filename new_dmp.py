@@ -50,7 +50,7 @@ class DMP:
         
         self.skill_name = TextInput(title="Skill Name", value='')
         self.num_basis = Slider(title="Number of Basis Functions", value=4, start=1, end=10, step=1)
-        self.alpha = Slider(title="Alpha", value=5.0, start=0.0, end=20.0, step=0.1)
+        self.alpha = Slider(title="Alpha", value=20.0, start=1.0, end=30.0, step=0.1)
 
         self.top_plot_source = ColumnDataSource(data=dict(xs=[], ys=[]))  
         self.bot_plot_source = ColumnDataSource(data=dict(xs=[], ys=[]))  
@@ -74,7 +74,9 @@ class DMP:
         x = self.truncated_trajectory_times.tolist()
 
         self.p1 = figure(plot_width=1000, plot_height=300, x_range=x_range)
-        ys1 = np.transpose(self.truncated_cartesian_trajectory - self.truncated_cartesian_trajectory[0,:]).tolist()
+        training_trajectory = self.truncated_cartesian_trajectory.copy()
+        training_trajectory[:,:3] -= self.truncated_cartesian_trajectory[0,:3].reshape((1,3))
+        ys1 = np.transpose(training_trajectory).tolist()
 
         self.top_plot_source.data = dict(x=x, y0=ys1[0], y1=ys1[1], y2=ys1[2], y3=ys1[3], y4=ys1[4], y5=ys1[5], y6=ys1[6])
         y_list = ['y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6']
@@ -89,13 +91,11 @@ class DMP:
 
         trajectory_times = self.truncated_trajectory_times.reshape(-1, 1)
         
-        trajectory = self.truncated_cartesian_trajectory - self.truncated_cartesian_trajectory[0,:]
-
         traj_time = len(np.arange(0, self.truncated_trajectory_times[-1], self.rollout_dt))
 
         self.pos_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
-        self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
-        self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+        self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, training_trajectory[:,:3])
+        self.quat_canonical_goal_time=self.truncated_trajectory_times[-1]
         self.quat_alpha_phase = self.truncated_trajectory_times[-1]
         quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
         quat_beta = quat_alpha / 4.0
@@ -103,7 +103,7 @@ class DMP:
                                       alpha_phase=self.quat_alpha_phase)
         # Quaternion DMPs right now use dt to get canonical variable.
         self.quat_weights, _ = self.quat_dmp_traj.train_using_individual_trajectory(
-            'quaternion', trajectory_times, trajectory[:, 3:], dt=self.rollout_dt)
+            'quaternion', trajectory_times, training_trajectory[:,3:], dt=self.rollout_dt)
         y_pos, dy_pos, x_pos, _, _ = self.pos_dmp_traj.run_dmp_with_weights(self.pos_dmp_weights,
                                                                    np.zeros((3)),
                                                                    self.rollout_dt,
@@ -111,8 +111,8 @@ class DMP:
 
         q, qd, qdd, q_xlog = self.quat_dmp_traj.run_quaternion_dmp_with_weights(
             self.quat_weights, 
-            trajectory[0, 3:], 
-            trajectory[-1, 3:], 
+            training_trajectory[0, 3:], 
+            training_trajectory[-1, 3:], 
             self.rollout_dt,
             traj_time=traj_time,
             quat_canonical_goal_time=self.quat_canonical_goal_time
@@ -139,20 +139,20 @@ class DMP:
         if self.dmp_type.active == 0:        
 
             x = self.truncated_trajectory_times.tolist()
-            ys1 = np.transpose(self.truncated_cartesian_trajectory - self.truncated_cartesian_trajectory[0,:]).tolist()
+            training_trajectory = self.truncated_cartesian_trajectory.copy()
+            training_trajectory[:,:3] -= self.truncated_cartesian_trajectory[0,:3].reshape((1,3))
+            ys1 = np.transpose(training_trajectory).tolist()
             self.top_plot_source.data = dict(x=x, y0=ys1[0], y1=ys1[1], y2=ys1[2], y3=ys1[3], y4=ys1[4], y5=ys1[5], y6=ys1[6])
             for i in range(7):
                 self.p1.legend.items[i].update(label=value(self.cart_legend_labels[i]))
 
             trajectory_times = self.truncated_trajectory_times.reshape(-1, 1)
         
-            trajectory = self.truncated_cartesian_trajectory - self.truncated_cartesian_trajectory[0,:]
-
             traj_time = len(np.arange(0, self.truncated_trajectory_times[-1], self.rollout_dt))
 
             self.pos_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
-            self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
-            self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+            self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, training_trajectory[:, :3])
+            self.quat_canonical_goal_time=self.truncated_trajectory_times[-1]
             self.quat_alpha_phase = self.truncated_trajectory_times[-1]
             quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
             quat_beta = quat_alpha / 4.0
@@ -160,7 +160,7 @@ class DMP:
                                           alpha_phase=self.quat_alpha_phase)
             # Quaternion DMPs right now use dt to get canonical variable.
             self.quat_weights, _ = self.quat_dmp_traj.train_using_individual_trajectory(
-                'quaternion', trajectory_times, trajectory[:, 3:], dt=self.rollout_dt)
+                'quaternion', trajectory_times, training_trajectory[:, 3:], dt=self.rollout_dt)
             y_pos, dy_pos, x_pos, _, _ = self.pos_dmp_traj.run_dmp_with_weights(self.pos_dmp_weights,
                                                                        np.zeros((3)),
                                                                        self.rollout_dt,
@@ -168,8 +168,8 @@ class DMP:
 
             q, qd, qdd, q_xlog = self.quat_dmp_traj.run_quaternion_dmp_with_weights(
                 self.quat_weights, 
-                trajectory[0, 3:], 
-                trajectory[-1, 3:], 
+                training_trajectory[0, 3:], 
+                training_trajectory[-1, 3:], 
                 self.rollout_dt,
                 traj_time=traj_time,
                 quat_canonical_goal_time=self.quat_canonical_goal_time
@@ -215,13 +215,14 @@ class DMP:
         if self.dmp_type.active == 0:
             trajectory_times = self.truncated_trajectory_times.reshape(-1, 1)
         
-            trajectory = self.truncated_cartesian_trajectory - self.truncated_cartesian_trajectory[0,:]
-
+            training_trajectory = self.truncated_cartesian_trajectory.copy()
+            training_trajectory[:,:3] -= self.truncated_cartesian_trajectory[0,:3].reshape((1,3))
+            
             traj_time = len(np.arange(0, self.truncated_trajectory_times[-1], self.rollout_dt))
 
             self.pos_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
-            self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
-            self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
+            self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, training_trajectory[:, :3])
+            self.quat_canonical_goal_time=self.truncated_trajectory_times[-1]
             self.quat_alpha_phase = self.truncated_trajectory_times[-1]
             quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
             quat_beta = quat_alpha / 4.0
@@ -229,7 +230,7 @@ class DMP:
                                           alpha_phase=self.quat_alpha_phase)
             # Quaternion DMPs right now use dt to get canonical variable.
             self.quat_weights, _ = self.quat_dmp_traj.train_using_individual_trajectory(
-                'quaternion', trajectory_times, trajectory[:, 3:], dt=self.rollout_dt)
+                'quaternion', trajectory_times, training_trajectory[:, 3:], dt=self.rollout_dt)
             y_pos, dy_pos, x_pos, _, _ = self.pos_dmp_traj.run_dmp_with_weights(self.pos_dmp_weights,
                                                                        np.zeros((3)),
                                                                        self.rollout_dt,
@@ -237,8 +238,8 @@ class DMP:
 
             q, qd, qdd, q_xlog = self.quat_dmp_traj.run_quaternion_dmp_with_weights(
                 self.quat_weights, 
-                trajectory[0, 3:], 
-                trajectory[-1, 3:], 
+                training_trajectory[0, 3:], 
+                training_trajectory[-1, 3:], 
                 self.rollout_dt,
                 traj_time=traj_time,
                 quat_canonical_goal_time=self.quat_canonical_goal_time
@@ -274,7 +275,7 @@ class DMP:
         dmp_params.dmp_type = int(self.dmp_type.active)
         if self.dmp_type.active == 0:
             pos_dmp_info = self.pos_dmp_traj.get_dmp_params(self.pos_dmp_weights)
-            quat_dmp_info = self.quat_dmp_traj.get_dmp_params(self.quat_dmp_weights)
+            quat_dmp_info = self.quat_dmp_traj.get_dmp_params(self.quat_weights)
             
             dmp_params.tau = pos_dmp_info['tau']
             dmp_params.alpha = pos_dmp_info['alpha']
