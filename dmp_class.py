@@ -750,6 +750,36 @@ class DMPTrajectory(object):
             pickle.dump(data_dict, pkl_f, protocol=2)
             print("Did save dmp params: {}".format(save_path))
 
+    def get_dmp_params(self, weights, **kwargs):
+        if self._add_min_jerk:
+            mean = [0.0] + self.mean.tolist()
+            inv_std = [0.0] + self.inv_std.tolist()
+        else:
+            mean = self.mean.tolist()
+            inv_std = self.inv_std.tolist()
+        phi_j_list = self.phi_j.tolist()
+        print(weights.shape)
+        weights_list = np.array(weights).flatten().tolist()
+
+        num_basis = self.num_basis + 1 if self._add_min_jerk else self.num_basis
+
+        data_dict = {
+            'tau': self.tau,
+            'alpha': self.alpha,
+            'beta': self.beta,
+            'num_dims': self.num_dims,
+            'num_basis': num_basis,
+            'num_sensors': self.num_sensors,
+            'mu': mean,
+            'h': inv_std,
+            'phi_j': phi_j_list,
+            'weights': weights_list,
+        }
+        for k, v in kwargs.items():
+            data_dict[k] = v
+
+        return data_dict
+
     def save_weights_csv(self,filename,weights):
         data=weights
         print('shape weights is ', data.shape)

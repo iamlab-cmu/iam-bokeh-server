@@ -15,6 +15,7 @@ from visualization import *
 from processing import *
 
 from bokeh_server_msgs.msg import Response
+from iam_common_msgs.msg import DMPParams
 from bokeh.layouts import column, row
 from bokeh.core.properties import value
 from bokeh.models import ColumnDataSource, Slider, TextInput, Button, RangeSlider, Panel, Tabs, Legend, LegendItem, Span, RadioButtonGroup, Spinner
@@ -27,33 +28,12 @@ class DMP:
         self.doc = curdoc()
         self.pub = pub
 
-        state_dict = pickle.load( open( '/home/sony/Documents/iam-web/iam-bokeh-server/franka_traj.pkl', "rb" ) )
-
-        self.cartesian_trajectory = {}
-        self.skill_state_dict = {}
+        self.cartesian_trajectory = []
+        self.joint_trajectory = []
         self.colors_list = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan']
         self.cart_legend_labels = ['x', 'y', 'z', 'qw', 'qx', 'qy', 'qz']
         self.joint_legend_labels = ['1', '2', '3', '4', '5', '6', '7']
-
-        for key in state_dict.keys():
-            skill_dict = state_dict[key]
             
-            if skill_dict["skill_description"] == "GuideMode":
-                self.skill_state_dict = skill_dict["skill_state_dict"]
-                self.cartesian_trajectory = process_cartesian_trajectories(self.skill_state_dict['O_T_EE'], use_quaternions=True, transform_in_row_format=True)
-                
-        self.trajectory_start_time = 0.0
-        self.trajectory_end_time = self.skill_state_dict['time_since_skill_started'][-1]
-
-        self.x_range = [self.trajectory_start_time, self.trajectory_end_time]
-
-        self.truncated_start_time = self.trajectory_start_time
-        self.truncated_end_time = self.trajectory_end_time
-
-        self.truncation_threshold = Spinner(title="Truncation Threshold", low=0, high=1, step=0.005, value=0.005)
-
-        (self.truncated_start_time, self.truncated_end_time) = get_start_and_end_times(self.skill_state_dict['time_since_skill_started'], self.cartesian_trajectory, self.skill_state_dict['q'], self.truncation_threshold.value)
-
         # add a button widget and configure with the call back
         self.submit_button = Button(label="Submit")
         self.submit_button.on_click(self.submit_callback)
@@ -67,8 +47,7 @@ class DMP:
         # add a button widget and configure with the call back
         self.truncate_button = Button(label="Automatically Truncate")
         self.truncate_button.on_click(self.truncate_callback)
-        self.time_range = RangeSlider(title="Truncated Time", value=(self.truncated_start_time,self.truncated_end_time), start=self.trajectory_start_time, end=self.trajectory_end_time, step=0.01)
-
+        
         self.skill_name = TextInput(title="Skill Name", value='')
         self.num_basis = Slider(title="Number of Basis Functions", value=4, start=1, end=10, step=1)
         self.alpha = Slider(title="Alpha", value=5.0, start=0.0, end=20.0, step=0.1)
@@ -85,21 +64,10 @@ class DMP:
         self.dmp_type = RadioButtonGroup(labels=["cartesian", "joint"], active=0)
         self.dmp_type.on_change('active', lambda attr, old, new: self.radio_callback())
 
-        self.start_time_span = Span(location=self.truncated_start_time,
-                              dimension='height', line_color='green',
-                              line_width=3)
-
-        self.end_time_span = Span(location=self.truncated_end_time,
-                              dimension='height', line_color='red',
-                              line_width=3)
-
-        self.time_range.js_link('value', self.start_time_span, 'location', attr_selector=0)
-        self.time_range.js_link('value', self.end_time_span, 'location', attr_selector=1)
-
     def continue_callback(self):
         self.doc.clear()
 
-        (self.truncated_trajectory_times, self.truncated_cartesian_trajectory, self.truncated_joint_trajectory) = truncate_trajectory(self.skill_state_dict['time_since_skill_started'], self.cartesian_trajectory, self.skill_state_dict['q'], self.start_time_span.location, self.end_time_span.location)
+        (self.truncated_trajectory_times, self.truncated_cartesian_trajectory, self.truncated_joint_trajectory) = truncate_trajectory(self.time_since_skill_started, self.cartesian_trajectory, self.joint_trajectory, self.start_time_span.location, self.end_time_span.location)
 
         x_range = [0.0, self.truncated_trajectory_times[-1]]
 
@@ -125,24 +93,24 @@ class DMP:
 
         traj_time = len(np.arange(0, self.truncated_trajectory_times[-1], self.rollout_dt))
 
-        dmp_pos_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
-        weights_pos, _ = dmp_pos_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
+        self.pos_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
+        self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
         self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
         self.quat_alpha_phase = self.truncated_trajectory_times[-1]
         quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
         quat_beta = quat_alpha / 4.0
-        dmp_quat_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
+        self.quat_dmp_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
                                       alpha_phase=self.quat_alpha_phase)
         # Quaternion DMPs right now use dt to get canonical variable.
-        weights_quat, _ = dmp_quat_traj.train_using_individual_trajectory(
+        self.quat_weights, _ = self.quat_dmp_traj.train_using_individual_trajectory(
             'quaternion', trajectory_times, trajectory[:, 3:], dt=self.rollout_dt)
-        y_pos, dy_pos, x_pos, _, _ = dmp_pos_traj.run_dmp_with_weights(weights_pos,
+        y_pos, dy_pos, x_pos, _, _ = self.pos_dmp_traj.run_dmp_with_weights(self.pos_dmp_weights,
                                                                    np.zeros((3)),
                                                                    self.rollout_dt,
                                                                    traj_time=traj_time)
 
-        q, qd, qdd, q_xlog = dmp_quat_traj.run_quaternion_dmp_with_weights(
-            weights_quat, 
+        q, qd, qdd, q_xlog = self.quat_dmp_traj.run_quaternion_dmp_with_weights(
+            self.quat_weights, 
             trajectory[0, 3:], 
             trajectory[-1, 3:], 
             self.rollout_dt,
@@ -182,24 +150,24 @@ class DMP:
 
             traj_time = len(np.arange(0, self.truncated_trajectory_times[-1], self.rollout_dt))
 
-            dmp_pos_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
-            weights_pos, _ = dmp_pos_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
+            self.pos_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
+            self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
             self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
             self.quat_alpha_phase = self.truncated_trajectory_times[-1]
             quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
             quat_beta = quat_alpha / 4.0
-            dmp_quat_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
+            self.quat_dmp_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
                                           alpha_phase=self.quat_alpha_phase)
             # Quaternion DMPs right now use dt to get canonical variable.
-            weights_quat, _ = dmp_quat_traj.train_using_individual_trajectory(
+            self.quat_weights, _ = self.quat_dmp_traj.train_using_individual_trajectory(
                 'quaternion', trajectory_times, trajectory[:, 3:], dt=self.rollout_dt)
-            y_pos, dy_pos, x_pos, _, _ = dmp_pos_traj.run_dmp_with_weights(weights_pos,
+            y_pos, dy_pos, x_pos, _, _ = self.pos_dmp_traj.run_dmp_with_weights(self.pos_dmp_weights,
                                                                        np.zeros((3)),
                                                                        self.rollout_dt,
                                                                        traj_time=traj_time)
 
-            q, qd, qdd, q_xlog = dmp_quat_traj.run_quaternion_dmp_with_weights(
-                weights_quat, 
+            q, qd, qdd, q_xlog = self.quat_dmp_traj.run_quaternion_dmp_with_weights(
+                self.quat_weights, 
                 trajectory[0, 3:], 
                 trajectory[-1, 3:], 
                 self.rollout_dt,
@@ -229,10 +197,10 @@ class DMP:
 
             
 
-            dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, self.num_dims, self.num_basis.value, self.num_sensors)
-            weights, x_and_y = dmp_traj.train_using_individual_trajectory("joint", trajectory_times, trajectory)
-            y, dy, _, _, _ = dmp_traj.run_dmp_with_weights(weights,
-                                    np.zeros((dmp_traj.num_dims)),
+            self.joint_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, self.num_dims, self.num_basis.value, self.num_sensors)
+            self.joint_dmp_weights, x_and_y = self.joint_dmp_traj.train_using_individual_trajectory("joint", trajectory_times, trajectory)
+            y, dy, _, _, _ = self.joint_dmp_traj.run_dmp_with_weights(self.joint_dmp_weights,
+                                    np.zeros((self.joint_dmp_traj.num_dims)),
                                     self.rollout_dt,
                                     traj_time=int(self.truncated_trajectory_times[-1] / self.rollout_dt))
 
@@ -251,24 +219,24 @@ class DMP:
 
             traj_time = len(np.arange(0, self.truncated_trajectory_times[-1], self.rollout_dt))
 
-            dmp_pos_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
-            weights_pos, _ = dmp_pos_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
+            self.pos_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, 3, self.num_basis.value, self.num_sensors)
+            self.pos_dmp_weights, _ = self.pos_dmp_traj.train_using_individual_trajectory('position', trajectory_times, trajectory[:, :3])
             self.quat_canonical_goal_time=(self.truncated_trajectory_times[-1]-1.0)
             self.quat_alpha_phase = self.truncated_trajectory_times[-1]
             quat_alpha, quat_num_basis = self.alpha.value, self.num_basis.value
             quat_beta = quat_alpha / 4.0
-            dmp_quat_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
+            self.quat_dmp_traj = DMPTrajectory(self.tau, quat_alpha, quat_beta, 3, quat_num_basis, 1, add_min_jerk=False, 
                                           alpha_phase=self.quat_alpha_phase)
             # Quaternion DMPs right now use dt to get canonical variable.
-            weights_quat, _ = dmp_quat_traj.train_using_individual_trajectory(
+            self.quat_weights, _ = self.quat_dmp_traj.train_using_individual_trajectory(
                 'quaternion', trajectory_times, trajectory[:, 3:], dt=self.rollout_dt)
-            y_pos, dy_pos, x_pos, _, _ = dmp_pos_traj.run_dmp_with_weights(weights_pos,
+            y_pos, dy_pos, x_pos, _, _ = self.pos_dmp_traj.run_dmp_with_weights(self.pos_dmp_weights,
                                                                        np.zeros((3)),
                                                                        self.rollout_dt,
                                                                        traj_time=traj_time)
 
-            q, qd, qdd, q_xlog = dmp_quat_traj.run_quaternion_dmp_with_weights(
-                weights_quat, 
+            q, qd, qdd, q_xlog = self.quat_dmp_traj.run_quaternion_dmp_with_weights(
+                self.quat_weights, 
                 trajectory[0, 3:], 
                 trajectory[-1, 3:], 
                 self.rollout_dt,
@@ -286,10 +254,10 @@ class DMP:
         
             trajectory = self.truncated_joint_trajectory - self.truncated_joint_trajectory[0,:]            
 
-            dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, self.num_dims, self.num_basis.value, self.num_sensors)
-            weights, x_and_y = dmp_traj.train_using_individual_trajectory("joint", trajectory_times, trajectory)
-            y, dy, _, _, _ = dmp_traj.run_dmp_with_weights(weights,
-                                    np.zeros((dmp_traj.num_dims)),
+            self.joint_dmp_traj = DMPTrajectory(self.tau, self.alpha.value, self.beta, self.num_dims, self.num_basis.value, self.num_sensors)
+            self.joint_dmp_weights, x_and_y = self.joint_dmp_traj.train_using_individual_trajectory("joint", trajectory_times, trajectory)
+            y, dy, _, _, _ = self.joint_dmp_traj.run_dmp_with_weights(self.joint_dmp_weights,
+                                    np.zeros((self.joint_dmp_traj.num_dims)),
                                     self.rollout_dt,
                                     traj_time=int(self.truncated_trajectory_times[-1] / self.rollout_dt))
 
@@ -301,13 +269,86 @@ class DMP:
     def done_callback(self):
         self.doc.clear()
 
+        response_msg = Response()
+        dmp_params = DMPParams()
+        dmp_params.dmp_type = int(self.dmp_type.active)
+        if self.dmp_type.active == 0:
+            pos_dmp_info = self.pos_dmp_traj.get_dmp_params(self.pos_dmp_weights)
+            quat_dmp_info = self.quat_dmp_traj.get_dmp_params(self.quat_dmp_weights)
+            
+            dmp_params.tau = pos_dmp_info['tau']
+            dmp_params.alpha = pos_dmp_info['alpha']
+            dmp_params.beta = pos_dmp_info['beta']
+            dmp_params.num_dims = int(pos_dmp_info['num_dims'])
+            dmp_params.num_basis = int(pos_dmp_info['num_basis'])
+            dmp_params.num_sensors = int(pos_dmp_info['num_sensors'])
+            dmp_params.mu = pos_dmp_info['mu']
+            dmp_params.h = pos_dmp_info['h']
+            dmp_params.phi_j = pos_dmp_info['phi_j']
+            dmp_params.weights = pos_dmp_info['weights']
+
+            dmp_params.quat_tau = quat_dmp_info['tau']
+            dmp_params.quat_alpha = quat_dmp_info['alpha']
+            dmp_params.quat_beta = quat_dmp_info['beta']
+            dmp_params.quat_num_dims = int(quat_dmp_info['num_dims'])
+            dmp_params.quat_num_basis = int(quat_dmp_info['num_basis'])
+            dmp_params.quat_num_sensors = int(quat_dmp_info['num_sensors'])
+            dmp_params.quat_mu = quat_dmp_info['mu']
+            dmp_params.quat_h = quat_dmp_info['h']
+            dmp_params.quat_phi_j = quat_dmp_info['phi_j']
+            dmp_params.quat_weights = quat_dmp_info['weights']
+        elif self.dmp_type.active == 1:
+            joint_dmp_info = self.joint_dmp_traj.get_dmp_params(self.joint_dmp_weights)
+            dmp_params.tau = joint_dmp_info['tau']
+            dmp_params.alpha = joint_dmp_info['alpha']
+            dmp_params.beta = joint_dmp_info['beta']
+            dmp_params.num_dims = int(joint_dmp_info['num_dims'])
+            dmp_params.num_basis = int(joint_dmp_info['num_basis'])
+            dmp_params.num_sensors = int(joint_dmp_info['num_sensors'])
+            dmp_params.mu = joint_dmp_info['mu']
+            dmp_params.h = joint_dmp_info['h']
+            dmp_params.phi_j = joint_dmp_info['phi_j']
+            dmp_params.weights = joint_dmp_info['weights']
+        response_msg.dmp_params = dmp_params
+
+        self.pub.publish(response_msg)
+
     def truncate_callback(self):
-        (self.truncated_start_time, self.truncated_end_time) = get_start_and_end_times(self.skill_state_dict['time_since_skill_started'], self.cartesian_trajectory, self.skill_state_dict['q'], self.truncation_threshold.value)
+        (self.truncated_start_time, self.truncated_end_time) = get_start_and_end_times(self.time_since_skill_started, self.cartesian_trajectory, self.joint_trajectory, self.truncation_threshold.value)
         self.start_time_span.location = self.truncated_start_time
         self.end_time_span.location = self.truncated_end_time
         
     def handle_dmp_training_request(self, request):
-        xs = np.tile(self.skill_state_dict['time_since_skill_started'].reshape((1,-1)), (7, 1)).tolist()
+        self.cartesian_trajectory = process_cartesian_trajectories(np.array(request.traj.cart_traj).reshape((-1,16)), use_quaternions=True, transform_in_row_format=True)
+        self.joint_trajectory = np.array(request.traj.joint_traj).reshape((-1, request.traj.num_joints))
+        self.time_since_skill_started = np.array(request.traj.time_since_skill_started)
+
+        self.trajectory_start_time = 0.0
+        self.trajectory_end_time = self.time_since_skill_started[-1]
+
+        self.x_range = [self.trajectory_start_time, self.trajectory_end_time]
+
+        self.truncated_start_time = self.trajectory_start_time
+        self.truncated_end_time = self.trajectory_end_time
+
+        self.truncation_threshold = Spinner(title="Truncation Threshold", low=0, high=1, step=0.005, value=0.005)
+
+        (self.truncated_start_time, self.truncated_end_time) = get_start_and_end_times(self.time_since_skill_started, self.cartesian_trajectory, self.joint_trajectory, self.truncation_threshold.value)
+
+        self.time_range = RangeSlider(title="Truncated Time", value=(self.truncated_start_time,self.truncated_end_time), start=self.trajectory_start_time, end=self.trajectory_end_time, step=0.01)
+
+        self.start_time_span = Span(location=self.truncated_start_time,
+                              dimension='height', line_color='green',
+                              line_width=3)
+
+        self.end_time_span = Span(location=self.truncated_end_time,
+                              dimension='height', line_color='red',
+                              line_width=3)
+
+        self.time_range.js_link('value', self.start_time_span, 'location', attr_selector=0)
+        self.time_range.js_link('value', self.end_time_span, 'location', attr_selector=1)
+
+        xs = np.tile(self.time_since_skill_started.reshape((1,-1)), (7, 1)).tolist()
 
         p1 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
         ys1 = np.transpose(self.cartesian_trajectory).tolist()
@@ -336,11 +377,11 @@ class DMP:
         tab2 = Panel(child=column(p2, row(self.truncation_threshold, self.truncate_button), self.time_range, self.continue_button, sizing_mode='scale_width'), title="Relative Cartesian Pose")
 
         p3 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
-        ys3 = np.transpose(self.skill_state_dict['q']).tolist()
+        ys3 = np.transpose(self.joint_trajectory).tolist()
         r3 = p3.multi_line(xs=xs, ys=ys3, color=self.colors_list, line_width=3)
 
         p4 = figure(plot_width=1000, plot_height=300, x_range=self.x_range)
-        ys4 = np.transpose(self.skill_state_dict['q']-self.skill_state_dict['q'][0,:]).tolist()
+        ys4 = np.transpose(self.joint_trajectory-self.joint_trajectory[0,:]).tolist()
         r4 = p4.multi_line(xs=xs, ys=ys4, color=self.colors_list, line_width=3)
 
         joint_legend = Legend(items=[
