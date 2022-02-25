@@ -3,11 +3,11 @@
 ## Installation
 
 ```
-pip install bokeh
+pip install -r requirements.txt
 ```
 
 ## Running Instructions
-1. Figure out your ip address and substitute it below.
+1. Run the following commands.
 
 ```
 bokeh serve --allow-websocket-origin='*' bokeh_server.py
