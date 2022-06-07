@@ -34,6 +34,7 @@ import helpers
 from new_dextr import DEXTR
 from new_dmp import DMP
 from point_goals import PointGoal
+from pizza_demo import PizzaDemo
 
 rospy.init_node('bokeh_server')
 
@@ -48,6 +49,7 @@ bridge = CvBridge()
 dmp = DMP(doc, pub)
 dextr = DEXTR(doc, pub, bridge)
 point_goal = PointGoal(doc, pub, bridge)
+pizza_demo = PizzaDemo(doc, pub)
 
 @gen.coroutine
 def handle_request(msg):
@@ -58,6 +60,8 @@ def handle_request(msg):
         dextr.handle_dextr_request(msg)
     elif msg.display_type == 2:
         point_goal.handle_point_goal_request(msg)
+    elif msg.display_type == 3:
+        pizza_demo.handle_pizza_demo_request(msg)
 
 def ros_handler():
 
