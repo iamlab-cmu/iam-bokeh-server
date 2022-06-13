@@ -2,6 +2,7 @@
 
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, Column, Button, TextInput, PointDrawTool
+
 from bokeh.io import curdoc
 from bokeh.events import Tap
 from bokeh.layouts import column, row
@@ -41,6 +42,7 @@ class PizzaDemo:
         # add a button widget and configure with the call back
         self.submit_button = Button(label="Submit")
         self.submit_button.on_click(self.submit_callback)
+
 
         self.pizza1_button = Button(label="Pizza1")
         self.pizza1_button.on_click(self.pizza1_callback)
