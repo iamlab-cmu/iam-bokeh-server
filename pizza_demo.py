@@ -63,7 +63,7 @@ class PizzaDemo:
     def tap_callback(self, event):
         coords=(event.x,event.y)
 
-        if len(correction_coord_list) == 0:
+        if len(self.demonstration_coord_list) == 0:
             self.demonstration_coord_list.append(coords)
         else:
             self.demonstration_coord_list = [coords]
@@ -90,7 +90,7 @@ class PizzaDemo:
 
         response_msg = Response()
         response_msg.query_type = self.query_type
-        response_msg.query_response = 1
+        response_msg.query_response = 0
         
         self.pub.publish(response_msg)
 
@@ -99,7 +99,7 @@ class PizzaDemo:
 
         response_msg = Response()
         response_msg.query_type = self.query_type
-        response_msg.query_response = 2
+        response_msg.query_response = 1
 
         self.pub.publish(response_msg)
 
@@ -123,7 +123,9 @@ class PizzaDemo:
 
 
     def handle_pizza_demo_request(self, request):
+        print('Received Pizza Request')
 
+        self.query_type = request.pizza.query_type
         self.pizza_diameter = request.pizza.pizza_diameter
         crust_thickness = request.pizza.crust_thickness
         topping_diameter = request.pizza.topping_diameter
@@ -131,24 +133,15 @@ class PizzaDemo:
         cheese_radius = 5 * (1-((crust_thickness*2)/ self.pizza_diameter))
         topping_radius = 5 * topping_diameter / self.pizza_diameter
 
-        self.query_type = request.pizza.query_type
-
-        pizza1_x = []
-        pizza1_y = []
-
-        for i in range(len(request.pizza.pizza_topping_positions_1)):
-            pizza1_x.append(request.pizza.pizza_topping_positions_1[i].x * 10 / self.pizza_diameter)
-            pizza1_y.append(request.pizza.pizza_topping_positions_1[i].y * 10 / self.pizza_diameter)
+        pizza1_x = np.array(request.pizza.pizza_topping_positions_1_x) * 10 / self.pizza_diameter + 5
+        pizza1_y = np.array(request.pizza.pizza_topping_positions_1_y) * 10 / self.pizza_diameter + 5
 
         # Query Type 0 is Preference
         if self.query_type == 0:
 
-            pizza2_x = []
-            pizza2_y = []
-
-            for i in range(len(request.pizza.pizza_topping_positions_2)):
-                pizza2_x.append(request.pizza.pizza_topping_positions_2[i].x * 10 / self.pizza_diameter)
-                pizza2_y.append(request.pizza.pizza_topping_positions_2[i].y * 10 / self.pizza_diameter)
+            print('Preference')
+            pizza2_x = np.array(request.pizza.pizza_topping_positions_2_x) * 10 / self.pizza_diameter + 5
+            pizza2_y = np.array(request.pizza.pizza_topping_positions_2_y) * 10 / self.pizza_diameter + 5
 
             pizza1_source = ColumnDataSource(data=dict(x=pizza1_x[:-1], y=pizza1_y[:-1]))
             pizza2_source = ColumnDataSource(data=dict(x=pizza2_x[:-1], y=pizza2_y[:-1]))
@@ -169,7 +162,7 @@ class PizzaDemo:
         
         # Query Type 1 is Binary Feedback
         elif self.query_type == 1:
-
+            print('Binary')
             pizza1_source = ColumnDataSource(data=dict(x=pizza1_x[:-1], y=pizza1_y[:-1]))
 
             self.p1.circle(x=[5], y=[5], radius=5, fill_color='peru')
@@ -182,7 +175,7 @@ class PizzaDemo:
 
         # Query Type 2 is Demonstration
         elif self.query_type == 2:
-
+            print('Demo')
             pizza1_source = ColumnDataSource(data=dict(x=pizza1_x, y=pizza1_y))
 
             self.p3.circle(x=[5], y=[5], radius=5, fill_color='peru')
@@ -197,7 +190,7 @@ class PizzaDemo:
 
         # Query Type 3 is Correction
         elif self.query_type == 3:
-
+            print('Correction')
             pizza1_source = ColumnDataSource(data=dict(x=pizza1_x[:-1], y=pizza1_y[:-1]))
 
             self.p1.circle(x=[5], y=[5], radius=5, fill_color='peru')
